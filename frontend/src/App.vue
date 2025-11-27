@@ -1,177 +1,247 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue';
 
-// --- 1. KONFIGURASI (SUDAH DIPERBAIKI: TANPA 7B) ---
-const floors = ['B', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A']
-const slotsPerFloor = 50
-const parkingData = ref({})
-const lastLog = ref("Menunggu koneksi server...")
+// --- 1. CONFIG DATA ---
+const floors = ['B', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5A', '5B', '6A', '6B', '7A'];
+const parkingData = ref({});
+const lastLog = ref("Menunggu Server...");
+const connectionStatus = ref(false);
 
-// --- 2. HELPER CLASS WARNA ---
-const getStatusClass = (status) => {
-  switch (status) {
-    case 'GREEN': return 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)] hover:bg-emerald-400'
-    case 'RED': return 'bg-rose-600 scale-110 border-2 border-white z-10 shadow-lg'
-    case 'YELLOW': return 'bg-amber-400 text-black animate-pulse border border-yellow-600'
-    default: return 'bg-slate-700'
+// Init Data Kosong
+floors.forEach(f => {
+  parkingData.value[f] = [];
+  for (let i = 1; i <= 70; i++) {
+    parkingData.value[f].push({
+      id: `${f}-${i.toString().padStart(2, '0')}`,
+      status: 'GREEN'
+    });
   }
-}
+});
 
-// --- 3. INISIALISASI DATA ---
-floors.forEach(floor => {
-  parkingData.value[floor] = []
-  for (let i = 1; i <= slotsPerFloor; i++) {
-    const slotId = `${floor}-${i.toString().padStart(2, '0')}`
-    parkingData.value[floor].push({ id: slotId, status: 'GREEN' })
-  }
-})
-
-// --- 4. MAPPING LAYOUT (Computed) ---
+// --- 2. LOGIC MAPPING VISUAL ---
 const mappedLayout = computed(() => {
-  const layout = {}
-  for (const floor of floors) {
-    const slots = parkingData.value[floor] || [] // Kasih fallback array kosong biar gak error
-    if (slots.length === 50) {
-      layout[floor] = {
-        top_row: slots.slice(0, 10),
-        mid_row_top: slots.slice(10, 20),
-        mid_row_bottom: slots.slice(20, 30),
-        bottom_row: slots.slice(30, 40),
-        left_col: slots.slice(40, 45),
-        right_col: slots.slice(45, 50),
-      }
+  const layout = {};
+  for (const f of floors) {
+    const s = parkingData.value[f];
+    if (s && s.length === 70) {
+      layout[f] = {
+        // ZONA 1: STRATEGIS (DEKAT PINTU/BAWAH) -> Slot 01-10
+        depan: s.slice(0, 10),
+
+        // ZONA 2: TENGAH (Slot 11-30)
+        tengah_bawah: s.slice(10, 20),
+        tengah_atas: s.slice(20, 30),
+
+        tengah_bawah2: s.slice(30, 40),
+        tengah_atas2: s.slice(40, 50),
+
+        // ZONA 3: BELAKANG (Slot 31-40)
+        belakang: s.slice(50, 60),
+
+        // ZONA 4: SISA/SAYAP (Slot 41-50)
+        sayap_kiri: s.slice(60, 65),
+        sayap_kanan: s.slice(65, 70)
+      };
     }
   }
-  return layout
-})
+  return layout;
+});
 
-// --- 5. KONEKSI WEBSOCKET ---
+// --- 3. STYLE HELPER ---
+const getSlotColor = (status) => {
+  if (status === 'GREEN') return 'bg-emerald-500/90 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]';
+  if (status === 'YELLOW') return 'bg-yellow-400 border-yellow-200 text-black animate-pulse';
+  if (status === 'RED') return 'bg-rose-600 border-white scale-110 shadow-lg z-10';
+  return 'bg-slate-700';
+};
+
+// --- 4. WEBSOCKET ---
 onMounted(() => {
-  const socket = new WebSocket("ws://localhost:8000/ws")
+  const ws = new WebSocket("ws://localhost:8000/ws");
 
-  socket.onopen = () => { lastLog.value = "✅ Terhubung! Simulasi berjalan..." }
+  ws.onopen = () => {
+    connectionStatus.value = true;
+    lastLog.value = "✅ Terhubung ke Sistem AI";
+  };
 
-  socket.onmessage = (event) => {
+  ws.onmessage = (e) => {
     try {
-      const data = JSON.parse(event.data)
-      if (data.message) lastLog.value = `[${data.time}] ${data.message}`
+      const d = JSON.parse(e.data);
+      // Update Log
+      if (d.message) lastLog.value = `[${d.time}] ${d.message}`;
 
-      if (data.id && data.status) {
-        const [floorName, number] = data.id.split('-')
-        if (parkingData.value[floorName]) {
-          const slotIndex = parseInt(number) - 1
-          if (parkingData.value[floorName][slotIndex]) {
-            parkingData.value[floorName][slotIndex].status = data.status
-          }
+      // Update Status Slot
+      if (d.id) {
+        const [floor, num] = d.id.split('-');
+        const idx = parseInt(num) - 1;
+        if (parkingData.value[floor] && parkingData.value[floor][idx]) {
+          parkingData.value[floor][idx].status = d.status;
         }
       }
-    } catch (e) {
-      console.error("Error parsing data:", e)
+    } catch (err) {
+      console.error(err);
     }
-  }
+  };
 
-  socket.onclose = () => { lastLog.value = "❌ Terputus. Pastikan backend jalan!" }
-})
+  ws.onclose = () => {
+    connectionStatus.value = false;
+    lastLog.value = "❌ Koneksi Terputus";
+  };
+});
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-900 text-slate-200 font-sans pb-20 selection:bg-indigo-500">
+  <div class="min-h-screen bg-[#0f172a] text-slate-200 font-sans pb-20">
 
-    <header class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-700 shadow-2xl py-4">
-      <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- HEADER -->
+    <div class="sticky top-0 z-50 bg-[#0f172a]/95 backdrop-blur border-b border-slate-800 shadow-2xl">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex items-center gap-3">
-          <div class="bg-indigo-600 p-2 rounded-lg">🅿️</div>
-          <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-300 bg-clip-text text-transparent">
-            Smart Parking AI</h1>
+          <div
+            class="h-10 w-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-xl">
+            🅿️</div>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight">Smart Parking AI</h1>
+            <p class="text-xs text-slate-400 font-mono uppercase tracking-wider">Real-time Optimization System</p>
+          </div>
         </div>
-        <div
-          class="bg-black/50 border border-slate-700 px-4 py-2 rounded font-mono text-sm text-cyan-400 flex items-center gap-3">
-          <span class="relative flex h-3 w-3">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-          </span>
-          {{ lastLog }}
+
+        <!-- LOG BOX -->
+        <div class="flex items-center gap-3 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-700">
+          <div class="relative flex h-2.5 w-2.5">
+            <span v-if="connectionStatus"
+              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5"
+              :class="connectionStatus ? 'bg-green-500' : 'bg-red-500'"></span>
+          </div>
+          <span class="font-mono text-xs text-cyan-400 truncate max-w-[250px]">{{ lastLog }}</span>
         </div>
       </div>
-    </header>
+    </div>
 
-    <main class="max-w-7xl mx-auto px-4 mt-8 flex flex-col gap-10">
+    <!-- CONTENT GRID -->
+    <main class="max-w-7xl mx-auto px-4 mt-8 grid gap-8">
+
+      <!-- LOOPING LANTAI -->
       <div v-for="(layout, floor) in mappedLayout" :key="floor"
-        class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 shadow-lg">
-        <h2 class="text-xl font-bold text-indigo-300 mb-4 border-b border-slate-700 pb-2">Lantai {{ floor }}</h2>
+        class="bg-[#1e293b]/50 border border-slate-700/50 rounded-2xl p-6 relative overflow-hidden">
 
-        <div class="flex flex-col items-center gap-4 bg-slate-900/80 p-4 rounded-lg border border-slate-700">
+        <!-- Label Lantai Background -->
+        <div class="absolute -right-4 -top-4 text-9xl font-black text-white/[0.03] pointer-events-none select-none">
+          {{ floor }}
+        </div>
 
-          <div class="flex gap-2">
-            <div v-for="slot in layout.top_row" :key="slot.id"
-              class="w-8 h-10 rounded flex items-center justify-center text-xs font-bold transition-all duration-300 cursor-pointer"
-              :class="getStatusClass(slot.status)">
-              {{ slot.id.split('-')[1] }}
-            </div>
-          </div>
+        <div class="relative z-10 flex flex-col items-center">
+          <h2
+            class="text-lg font-bold text-indigo-300 mb-6 flex items-center gap-2 w-full border-b border-slate-700 pb-2">
+            <span class="block w-1.5 h-6 bg-indigo-500 rounded-full"></span>
+            Lantai {{ floor }}
+          </h2>
 
-          <div class="w-full h-1 bg-slate-600 rounded-full"></div>
+          <!-- DENAH PARKIR -->
+          <div class="flex flex-col gap-3 bg-[#0f172a] p-5 rounded-xl border border-slate-800 shadow-inner">
 
-          <div class="flex justify-between w-full gap-8">
-            <div class="flex flex-col gap-2">
-              <div v-for="slot in layout.left_col" :key="slot.id"
-                class="w-10 h-8 rounded flex items-center justify-center text-xs font-bold transition-all duration-300 cursor-pointer"
-                :class="getStatusClass(slot.status)">
-                {{ slot.id.split('-')[1] }}
+            <!-- 1. AREA BELAKANG (Slot 31-40) - Paling Atas -->
+            <div class="flex justify-center gap-2">
+              <div v-for="s in layout.belakang" :key="s.id" :class="getSlotColor(s.status)"
+                class="w-8 h-10 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                {{ s.id.split('-')[1] }}
               </div>
             </div>
 
-            <div class="flex flex-col gap-1">
-              <div class="flex gap-2">
-                <div v-for="slot in layout.mid_row_top" :key="slot.id"
-                  class="w-8 h-10 rounded flex items-center justify-center text-xs font-bold transition-all duration-300 cursor-pointer"
-                  :class="getStatusClass(slot.status)">
-                  {{ slot.id.split('-')[1] }}
+            <!-- 2. AREA TENGAH (Slot 11-30 + Sayap) -->
+            <div class="flex gap-6 justify-center items-center">
+              <!-- Sayap Kiri (41-45) -->
+              <div class="flex flex-col gap-2">
+                <div v-for="s in layout.sayap_kiri" :key="s.id" :class="getSlotColor(s.status)"
+                  class="w-10 h-8 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                  {{ s.id.split('-')[1] }}
                 </div>
               </div>
-              <div class="flex gap-2">
-                <div v-for="slot in layout.mid_row_bottom" :key="slot.id"
-                  class="w-8 h-10 rounded flex items-center justify-center text-xs font-bold transition-all duration-300 cursor-pointer"
-                  :class="getStatusClass(slot.status)">
-                  {{ slot.id.split('-')[1] }}
+
+              <div class="flex flex-col gap-8 mt-4">
+                <!-- Blok Tengah -->
+                <div class="flex flex-col gap-1">
+                  <!-- Tengah Atas (21-30) -->
+                  <div class="flex gap-2">
+                    <div v-for="s in layout.tengah_atas2" :key="s.id" :class="getSlotColor(s.status)"
+                      class="w-8 h-10 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                      {{ s.id.split('-')[1] }}
+                    </div>
+                  </div>
+                  <!-- Tengah Bawah (11-20) -->
+                  <div class="flex gap-2">
+                    <div v-for="s in layout.tengah_bawah2" :key="s.id" :class="getSlotColor(s.status)"
+                      class="w-8 h-10 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                      {{ s.id.split('-')[1] }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <!-- Tengah Atas (21-30) -->
+                  <div class="flex gap-2">
+                    <div v-for="s in layout.tengah_atas" :key="s.id" :class="getSlotColor(s.status)"
+                      class="w-8 h-10 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                      {{ s.id.split('-')[1] }}
+                    </div>
+                  </div>
+                  <!-- Tengah Bawah (11-20) -->
+                  <div class="flex gap-2">
+                    <div v-for="s in layout.tengah_bawah" :key="s.id" :class="getSlotColor(s.status)"
+                      class="w-8 h-10 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                      {{ s.id.split('-')[1] }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sayap Kanan (46-50) -->
+              <div class="flex flex-col gap-2">
+                <div v-for="s in layout.sayap_kanan" :key="s.id" :class="getSlotColor(s.status)"
+                  class="w-10 h-8 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300">
+                  {{ s.id.split('-')[1] }}
                 </div>
               </div>
             </div>
 
-            <div class="flex flex-col gap-2">
-              <div v-for="slot in layout.right_col" :key="slot.id"
-                class="w-10 h-8 rounded flex items-center justify-center text-xs font-bold transition-all duration-300 cursor-pointer"
-                :class="getStatusClass(slot.status)">
-                {{ slot.id.split('-')[1] }}
+            <!-- SPASI SEBELUM AREA DEPAN -->
+            <div class="h-2"></div>
+
+            <!-- 3. AREA DEPAN / PINTU (Slot 01-10) - DIPINDAH KE ATAS JALAN -->
+            <div class="flex justify-center gap-2 relative p-1">
+
+              <!-- Label Masuk -->
+              <div class="absolute -left-14 top-1/2 -translate-y-1/2 flex flex-col items-end gap-1">
+                <span
+                  class="text-[9px] font-bold text-emerald-400 bg-emerald-900/30 px-1.5 py-0.5 rounded animate-pulse border border-emerald-500/30">MASUK
+                  ⬆</span>
+              </div>
+
+              <div v-for="s in layout.depan" :key="s.id" :class="getSlotColor(s.status)"
+                class="w-8 h-10 rounded flex items-center justify-center text-[10px] font-bold border border-white/10 transition-all duration-300 shadow-lg">
+                {{ s.id.split('-')[1] }}
+              </div>
+
+              <!-- Label Keluar -->
+              <div class="absolute -right-14 top-1/2 -translate-y-1/2 flex flex-col items-start gap-1">
+                <span
+                  class="text-[9px] font-bold text-rose-400 bg-rose-900/30 px-1.5 py-0.5 rounded border border-rose-500/30">KELUAR
+                  ⬇</span>
               </div>
             </div>
-          </div>
 
-          <div class="w-full h-1 bg-slate-600 rounded-full"></div>
-
-          <div class="flex gap-2 relative">
-            <div v-for="slot in layout.bottom_row" :key="slot.id"
-              class="w-8 h-10 rounded flex items-center justify-center text-xs font-bold transition-all duration-300 cursor-pointer"
-              :class="getStatusClass(slot.status)">
-              {{ slot.id.split('-')[1] }}
+            <!-- JALUR UTAMA (Main Road) - DIPINDAH KE PALING BAWAH -->
+            <div
+              class="w-full h-10 border-t-2 border-dashed border-slate-600/40 relative mt-1 bg-slate-800/20 rounded-b-lg">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-[10px] font-mono text-slate-500 tracking-[0.3em]">JALUR UTAMA</span>
+              </div>
             </div>
-            <span class="absolute -left-12 top-2 text-xs font-bold text-green-500">MASUK</span>
-            <span class="absolute -right-12 top-2 text-xs font-bold text-red-500">KELUAR</span>
+
           </div>
         </div>
       </div>
     </main>
   </div>
 </template>
-<!-- <style> -->
-<!-- @reference "./style.css"; -->
-<!-- /* sesuaikan path */ -->
-<!---->
-<!-- .slot-h { -->
-<!--   @apply w-10 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition-all duration-200; -->
-<!-- } -->
-<!---->
-<!-- .slot-v { -->
-<!--   @apply w-10 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition-all duration-200; -->
-<!-- } -->
-<!-- </style> -->
