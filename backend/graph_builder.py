@@ -1,71 +1,65 @@
 import networkx as nx
-from models import ParkingBuilding
-
-COST_SLOT = 1
-COST_AISLE = 1
-COST_RAMP = 20
 
 
 class ParkingGraphBuilder:
-    def __init__(self, building: ParkingBuilding):
+    def __init__(self, building):
         self.building = building
         self.G = nx.DiGraph()
-        self.floor_list = building.floor_list
 
     def build_graph(self):
-        self.G.add_node("GATE_ENTRY", type="GATE")
+        # Node Awal
+        self.G.add_node("GATE_ENTRY")
 
-        for i, floor_name in enumerate(self.floor_list):
-            self._build_floor_template(floor_name)
+        # --- KONFIGURASI BIAYA (LOGIKA JARAK) ---
+        # Biaya jalan datar antar node utama
+        COST_FLAT = 1
+        # Biaya naik lantai (Ramp) -> Dibuat MAHAL biar dia menuhin lantai bawah dulu
+        COST_RAMP = 100
 
-            if i < len(self.floor_list) - 1:
-                next_floor = self.floor_list[i + 1]
-                self._connect_floors(floor_name, next_floor)
+        floors = self.building.floor_list
 
-        self.G.add_edge(
-            "GATE_ENTRY", f"A_{self.floor_list[0]}_start", weight=COST_AISLE
-        )
+        # 1. Hubungkan GATE ke Jalur Utama Lantai Paling Bawah (B)
+        # Ini memastikan dia ngecek Basement dulu
+        first_floor_aisle = f"A_{floors[0]}"
+        self.G.add_edge("GATE_ENTRY", first_floor_aisle, weight=COST_FLAT)
 
-        print(f"Graph Selesai. Total Simpul (Nodes): {self.G.number_of_nodes()}")
-        print(f"Total Jalur Edge (Edges): {self.G.number_of_edges()}")
-        return self.G
+        for i, floor in enumerate(floors):
+            # Node Jalur Utama per Lantai (Aisle)
+            aisle_node = f"A_{floor}"
+            self.G.add_node(aisle_node)
 
-    def _build_floor_template(self, floor_name):
-        aisle_start = f"A_{floor_name}_start"
-        aisle_mid = f"A_{floor_name}_mid"
-        aisle_end = f"A_{floor_name}_end"
-
-        self.G.add_nodes_from(
-            [
-                (aisle_start, {"type": "AISLE"}),
-                (aisle_mid, {"type": "AISLE"}),
-                (aisle_end, {"type": "AISLE"}),
+            # Ambil semua slot di lantai ini
+            floor_slots = [
+                s for id, s in self.building.slots.items() if s.floor_name == floor
             ]
+
+            for slot in floor_slots:
+                # --- LOGIKA BARU: BIAYA BERDASARKAN POSISI ---
+                # Slot 01-10 (Depan/Bawah) -> Paling Murah (Jarak dekat)
+                if slot.number <= 10:
+                    slot_weight = 1
+                # Slot 11-30 (Tengah) -> Sedang
+                elif slot.number <= 30:
+                    slot_weight = 5
+                # Slot 31-50 (Belakang/Atas) -> Paling Jauh
+                else:
+                    slot_weight = 10
+
+                # Hubungkan Aisle ke Slot dengan bobot dinamis tadi
+                self.G.add_edge(aisle_node, slot.id, weight=slot_weight)
+                self.G.add_edge(slot.id, aisle_node, weight=slot_weight)
+
+            # 2. Hubungkan ke Lantai Berikutnya (Ramp Naik)
+            if i < len(floors) - 1:
+                next_floor = floors[i + 1]
+                ramp_up = f"R_{floor}_{next_floor}"
+                next_aisle = f"A_{next_floor}"
+
+                # Aisle -> Ramp -> Next Aisle
+                self.G.add_edge(aisle_node, ramp_up, weight=COST_FLAT)
+                self.G.add_edge(ramp_up, next_aisle, weight=COST_RAMP)  # Denda Mahal!
+
+        print(
+            f"✅ Graph Terbentuk dengan Logic Jarak: {self.G.number_of_nodes()} Nodes"
         )
-
-        self.G.add_edge(aisle_start, aisle_mid, weight=COST_AISLE)
-        self.G.add_edge(aisle_mid, aisle_end, weight=COST_AISLE)
-
-        floor_slots = [s for s in self.building.slots if s.startswith(f"{floor_name}-")]
-
-        for i, slot_id in enumerate(floor_slots):
-            if i < self.building.slots_per_level / 2:
-                self.G.add_edge(aisle_start, slot_id, weight=COST_SLOT)
-
-                self.G.add_edge(slot_id, aisle_start, weight=COST_SLOT)
-
-            else:
-                self.G.add_edge(aisle_mid, slot_id, weight=COST_SLOT)
-
-                self.G.add_edge(slot_id, aisle_mid, weight=COST_SLOT)
-
-    def _connect_floors(self, current_floor, next_floor):
-        ramp_up_node = f"R_UP_{current_floor}_to_{next_floor}"
-        self.G.add_node(ramp_up_node, type="RAMP")
-        self.G.add_edge(f"A_{current_floor}_end", ramp_up_node, weight=COST_AISLE)
-        self.G.add_edge(ramp_up_node, f"A_{next_floor}_start", weight=COST_RAMP)
-
-        ramp_down_node = f"R_DOWN_{next_floor}_to_{current_floor}"
-        self.G.add_node(ramp_down_node, type="RAMP")
-        self.G.add_edge(f"A_{next_floor}_end", ramp_down_node, weight=COST_AISLE)
-        self.G.add_edge(ramp_down_node, f"A_{current_floor}_start", weight=COST_RAMP)
+        return self.G
