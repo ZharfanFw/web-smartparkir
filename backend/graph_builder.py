@@ -1,65 +1,59 @@
 import networkx as nx
 
-
 class ParkingGraphBuilder:
     def __init__(self, building):
         self.building = building
         self.G = nx.DiGraph()
 
     def build_graph(self):
-        # Node Awal
         self.G.add_node("GATE_ENTRY")
-
-        # --- KONFIGURASI BIAYA (LOGIKA JARAK) ---
-        # Biaya jalan datar antar node utama
+        
         COST_FLAT = 1
-        # Biaya naik lantai (Ramp) -> Dibuat MAHAL biar dia menuhin lantai bawah dulu
-        COST_RAMP = 100
+        COST_RAMP = 100 # Tetap mahal agar lantai bawah penuh dulu
 
         floors = self.building.floor_list
-
-        # 1. Hubungkan GATE ke Jalur Utama Lantai Paling Bawah (B)
-        # Ini memastikan dia ngecek Basement dulu
         first_floor_aisle = f"A_{floors[0]}"
         self.G.add_edge("GATE_ENTRY", first_floor_aisle, weight=COST_FLAT)
 
         for i, floor in enumerate(floors):
-            # Node Jalur Utama per Lantai (Aisle)
             aisle_node = f"A_{floor}"
             self.G.add_node(aisle_node)
 
-            # Ambil semua slot di lantai ini
             floor_slots = [
                 s for id, s in self.building.slots.items() if s.floor_name == floor
             ]
 
             for slot in floor_slots:
-                # --- LOGIKA BARU: BIAYA BERDASARKAN POSISI ---
-                # Slot 01-10 (Depan/Bawah) -> Paling Murah (Jarak dekat)
+                # --- LOGIKA BARU SESUAI VISUAL FRONTEND ---
+                
+                # ZONA 1: Depan (Slot 01-10) -> Sangat Strategis
                 if slot.number <= 10:
                     slot_weight = 1
-                # Slot 11-30 (Tengah) -> Sedang
-                elif slot.number <= 30:
+                
+                # ZONA 2: Tengah Bawah & Atas (Slot 11-50) -> Standar
+                elif slot.number <= 50:
                     slot_weight = 5
-                # Slot 31-50 (Belakang/Atas) -> Paling Jauh
+                
+                # ZONA 3: Belakang (Slot 51-60) -> Agak Jauh
+                elif slot.number <= 60:
+                    slot_weight = 8
+                    
+                # ZONA 4: Sayap Kiri & Kanan (Slot 61-70) -> Paling Jauh/Sempit
                 else:
-                    slot_weight = 10
+                    slot_weight = 12 
 
-                # Hubungkan Aisle ke Slot dengan bobot dinamis tadi
+                # Hubungkan Aisle ke Slot
                 self.G.add_edge(aisle_node, slot.id, weight=slot_weight)
                 self.G.add_edge(slot.id, aisle_node, weight=slot_weight)
 
-            # 2. Hubungkan ke Lantai Berikutnya (Ramp Naik)
+            # Koneksi antar lantai
             if i < len(floors) - 1:
                 next_floor = floors[i + 1]
                 ramp_up = f"R_{floor}_{next_floor}"
                 next_aisle = f"A_{next_floor}"
 
-                # Aisle -> Ramp -> Next Aisle
                 self.G.add_edge(aisle_node, ramp_up, weight=COST_FLAT)
-                self.G.add_edge(ramp_up, next_aisle, weight=COST_RAMP)  # Denda Mahal!
+                self.G.add_edge(ramp_up, next_aisle, weight=COST_RAMP)
 
-        print(
-            f"✅ Graph Terbentuk dengan Logic Jarak: {self.G.number_of_nodes()} Nodes"
-        )
+        print(f"✅ Graph Terbentuk: {self.G.number_of_nodes()} Nodes (Support 70 Slot)")
         return self.G

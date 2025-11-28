@@ -1,18 +1,17 @@
 import random
-import traceback  # BIAR KELIATAN ERRORNYA
-
+import traceback
 import networkx as nx
 from graph_builder import ParkingGraphBuilder
 from models import ParkingBuilding
 
 # --- INIT GRAPH ---
 print("🔄 Memuat Graph UPI...")
-building = ParkingBuilding(slots_per_level=50)
+# UPDATE: slots_per_level diubah jadi 70 sesuai frontend
+building = ParkingBuilding(slots_per_level=70) 
 graph_builder = ParkingGraphBuilder(building)
 PARKING_GRAPH = graph_builder.build_graph()
 print("✅ Graph Siap!")
 # ------------------
-
 
 class ParkingSimulation:
     def __init__(self, env):
@@ -26,24 +25,25 @@ class ParkingSimulation:
         self.env.process(self.generate_motors())
 
     def log_event(self, slot_id, status, message):
-        print(f"[{self.env.now:.1f}s] {message}")
-        self.events.append(
-            {
-                "id": slot_id,
-                "status": status,
-                "message": message,
-                "time": f"{self.env.now:.1f}s",
-            }
-        )
+        # Format waktu disesuaikan agar enak dibaca di frontend
+        time_str = f"{self.env.now:.1f}s"
+        print(f"[{time_str}] {message}")
+        
+        self.events.append({
+            "id": slot_id,
+            "status": status,
+            "message": message,
+            "time": time_str
+        })
 
     def find_best_slot_astar(self):
         source_node = "GATE_ENTRY"
         best_slot_id = None
         min_cost = float("inf")
 
+        # Cari hanya yang GREEN
         available_slots = [
-            slot.id
-            for id, slot in self.building.slots.items()
+            slot.id for id, slot in self.building.slots.items()
             if slot.status == "GREEN"
         ]
 
@@ -66,45 +66,37 @@ class ParkingSimulation:
     def generate_motors(self):
         motor_id = 1
         while True:
-            yield self.env.timeout(random.randint(1, 3))
-            # Panggil motor_activity dengan Error Handling
+            # Random kedatangan motor dipercepat sedikit agar frontend lebih ramai
+            yield self.env.timeout(random.uniform(0.5, 2.0))
             self.env.process(self.motor_activity(motor_id))
             motor_id += 1
 
     def motor_activity(self, motor_id):
         try:
-            # --- LOGIKA UTAMA ---
             chosen_slot_id = self.find_best_slot_astar()
 
             if not chosen_slot_id:
                 self.log_event(None, "FULL", f"Motor #{motor_id} PULANG (Penuh!)")
                 return
 
-            # Booking (YELLOW)
+            # 1. Booking (Kuning)
             self.building.update_status(chosen_slot_id, "YELLOW")
-            self.log_event(
-                chosen_slot_id, "YELLOW", f"Motor #{motor_id} Booking {chosen_slot_id}"
-            )
+            self.log_event(chosen_slot_id, "YELLOW", f"Motor #{motor_id} Booking {chosen_slot_id}")
 
-            yield self.env.timeout(random.randint(3, 5))
+            # Waktu jalan ke slot
+            yield self.env.timeout(random.randint(2, 4))
 
-            # Parkir (RED)
+            # 2. Parkir (Merah)
             self.building.update_status(chosen_slot_id, "RED")
-            self.log_event(
-                chosen_slot_id, "RED", f"Motor #{motor_id} Parkir di {chosen_slot_id}"
-            )
+            self.log_event(chosen_slot_id, "RED", f"Motor #{motor_id} Parkir di {chosen_slot_id}")
 
+            # Durasi Parkir
             yield self.env.timeout(random.randint(10, 20))
 
-            # Keluar (GREEN)
+            # 3. Keluar (Hijau)
             self.building.update_status(chosen_slot_id, "GREEN")
-            self.log_event(
-                chosen_slot_id,
-                "GREEN",
-                f"Motor #{motor_id} Keluar dari {chosen_slot_id}",
-            )
+            self.log_event(chosen_slot_id, "GREEN", f"Motor #{motor_id} Selesai {chosen_slot_id}")
 
         except Exception:
-            # INI DIA YANG KITA CARI: PENANGKAP ERROR
-            print(f"🔥 ERROR PARAH di Motor #{motor_id}:")
-            traceback.print_exc()  # Cetak error lengkap ke terminal
+            print(f"🔥 ERROR di Motor #{motor_id}:")
+            traceback.print_exc()
