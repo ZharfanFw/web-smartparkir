@@ -118,6 +118,7 @@ Berikut adalah gambaran hasil implementasi sistem:
 - **[Zharfan Faza Wibawa 2403995]**
 - **[Zufar Ahmad Maulidy 2400285]**
 - **[Muhammad Fittra Novria Rizky 2411481]**
+
 Universitas Pendidikan Indonesia (UPI)
 _Mata Kuliah Kecerdasan Buatan (AI)_
 
