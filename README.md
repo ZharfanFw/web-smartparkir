@@ -113,8 +113,8 @@ Berikut adalah gambaran hasil implementasi sistem:
 ---
 
 ## 📝 Author
-**Kelompok 8**
-
+**Kelas C1**
+**Kelompok 8:**
 - **[Muhammad Maulana Adrian 2408647]**
 - **[Zharfan Faza Wibawa 2403995]**
 - **[Zufar Ahmad Maulidy 2400285]**
