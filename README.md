@@ -123,6 +123,7 @@ Berikut adalah gambaran hasil implementasi sistem:
 - **[Muhammad Fittra Novria Rizky 2411481]**
 
 Universitas Pendidikan Indonesia (UPI)
+
 _Mata Kuliah Kecerdasan Buatan (AI)_
 
 ---
