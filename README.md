@@ -113,6 +113,7 @@ Berikut adalah gambaran hasil implementasi sistem:
 ---
 
 ## 📝 Author
+**Kelompok 8**
 
 - **[Muhammad Maulana Adrian 2408647]**
 - **[Zharfan Faza Wibawa 2403995]**
