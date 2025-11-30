@@ -114,10 +114,10 @@ Berikut adalah gambaran hasil implementasi sistem:
 
 ## 📝 Author
 
-**[Muhammad Maulana Adrian 2408647]**
-**[Zharfan Faza Wibawa 2403995]**
-**[Zufar Ahmad Maulidy 2400285]**
-**[Muhammad Fittra Novria Rizky 2411481]**
+- **[Muhammad Maulana Adrian 2408647]**
+- **[Zharfan Faza Wibawa 2403995]**
+- **[Zufar Ahmad Maulidy 2400285]**
+- **[Muhammad Fittra Novria Rizky 2411481]**
 Universitas Pendidikan Indonesia (UPI)
 _Mata Kuliah Kecerdasan Buatan (AI)_
 
