@@ -66,8 +66,8 @@ class ParkingSimulation:
     def generate_motors(self):
         motor_id = 1
         while True:
-            # Random kedatangan motor dipercepat sedikit agar frontend lebih ramai
-            yield self.env.timeout(random.uniform(0.5, 2.0))
+            # BARU: Muncul sangat cepat (0.1 sampai 0.5 detik)
+            yield self.env.timeout(random.uniform(0.1, 0.5))
             self.env.process(self.motor_activity(motor_id))
             motor_id += 1
 
@@ -91,7 +91,7 @@ class ParkingSimulation:
             self.log_event(chosen_slot_id, "RED", f"Motor #{motor_id} Parkir di {chosen_slot_id}")
 
             # Durasi Parkir
-            yield self.env.timeout(random.randint(10, 20))
+            yield self.env.timeout(random.randint(300, 420))
 
             # 3. Keluar (Hijau)
             self.building.update_status(chosen_slot_id, "GREEN")
