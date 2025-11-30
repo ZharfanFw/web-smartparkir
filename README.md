@@ -91,7 +91,7 @@ Berikut adalah gambaran hasil implementasi sistem:
 | **Pre-filled Slots**  | Kondisi awal gedung yang sudah terisi slot merah secara acak.                |
 | **Pathfinding Logic** | Lantai bawah (B, 1A) penuh terlebih dahulu sebelum motor naik ke 2A.         |
 
-_(Anda dapat menambahkan screenshot hasil run program di sini)_
+![alt text](image.png)
 
 ---
 
@@ -108,15 +108,17 @@ _(Anda dapat menambahkan screenshot hasil run program di sini)_
 
 - [ ] **Heatmap Dashboard:** Analisis visual area parkir yang paling sering penuh.
 - [ ] **IoT Integration:** Mengganti generator acak dengan input sensor fisik/kamera.
-- [ ] **Mobile App:** Fitur reservasi slot bagi pengguna sebelum tiba di lokasi.
 - [ ] **Multi-Vehicle Types:** Dukungan slot khusus untuk Mobil dan EV (Electric Vehicle).
 
 ---
 
 ## 📝 Author
 
-**[Nama Anda]**
-Mahasiswa Universitas Pendidikan Indonesia (UPI)
+**[Muhammad Maulana Adrian 2408647]**
+**[Zharfan Faza Wibawa 2403995]**
+**[Zufar Ahmad Maulidy 2400285]**
+**[Muhammad Fittra Novria Rizky 2411481]**
+Universitas Pendidikan Indonesia (UPI)
 _Mata Kuliah Kecerdasan Buatan (AI)_
 
 ---
